@@ -1,0 +1,28 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "cinematic:cutscene_player",
+      "materials": {
+        "default": "entity_alphatest"
+      },
+      "textures": {
+        "default": "textures/entity/steve"
+      },
+      "geometry": {
+        "default": "geometry.humanoid"
+      },
+      "scripts": {
+        "animate": [
+          "controller"
+        ]
+      },
+      "animations": {
+        "controller": "controller.animation.cutscene_player",
+        "wake_up": "animation.player.cinematic.wake_up"
+      },
+      "render_controllers": ["controller.render.player"],
+      "spawn_egg": {}
+    }
+  }
+}
