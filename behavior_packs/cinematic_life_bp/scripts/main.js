@@ -1,7 +1,7 @@
 import "./deathHandler.js";
 import "./sleepHandler.js";
-import { world, system } from "@minecraft/server";
-import { getDaysSurvived, setDaysSurvived } from "./utils.js";
+import { world } from "@minecraft/server";
+import { setDaysSurvived } from "./utils.js";
 
 // Initialize days survived on first join
 world.afterEvents.playerSpawn.subscribe((event) => {
