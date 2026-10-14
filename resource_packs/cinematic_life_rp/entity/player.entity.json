@@ -3,7 +3,10 @@
   "minecraft:client_entity": {
     "description": {
       "identifier": "minecraft:player",
-      "materials": { "default": "entity_alphatest", "cape": "entity_alphatest" },
+      "materials": {
+        "default": "entity_alphatest",
+        "cape": "entity_alphatest"
+      },
       "textures": {
         "default": "textures/entity/steve",
         "cape": "textures/entity/cape_invisible"
@@ -18,9 +21,12 @@
         ]
       },
       "animations": {
-        "cinematic_controller": "controller.animation.player.cinematic"
+        "cinematic_controller": "controller.animation.player.cinematic",
+        "wake_up": "animation.player.cinematic.wake_up"
       },
-      "render_controllers": ["controller.render.player"],
+      "render_controllers": [
+        "controller.render.player"
+      ],
       "enable_attachables": true
     }
   }
