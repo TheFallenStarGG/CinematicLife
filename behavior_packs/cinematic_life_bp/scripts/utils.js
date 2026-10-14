@@ -1,3 +1,4 @@
+import { system } from "@minecraft/server";
 import { CONFIG } from "./config.js";
 
 export function getDaysSurvived(player) {
@@ -9,8 +10,7 @@ export function setDaysSurvived(player, value) {
 }
 
 export function incrementDaysSurvived(player) {
-  const current = getDaysSurvived(player);
-  setDaysSurvived(player, current + 1);
+  setDaysSurvived(player, getDaysSurvived(player) + 1);
 }
 
 export function hasBedSpawn(player) {
@@ -27,36 +27,57 @@ export function applyRespawnProtection(player) {
       amplifier: 0,
       showParticles: false
     });
+
+    // Visual indicator
+    if (CONFIG.protectionParticles) {
+      player.addEffect("absorption", CONFIG.respawnProtectionSeconds * 20, {
+        amplifier: 0,
+        showParticles: true
+      });
+    }
   } catch (e) {
-    console.warn("Failed to apply respawn protection:", e);
+    console.warn("Protection failed:", e);
   }
 }
 
 export function playYouDiedScreen(player) {
   const days = getDaysSurvived(player);
-  player.onScreenDisplay.setTitle("§cYou Died", {
+  const choice = CONFIG.deathTitles[Math.floor(Math.random() * CONFIG.deathTitles.length)];
+  const subtitle = choice.subtitle.replace("{days}", days);
+
+  player.onScreenDisplay.setTitle(choice.title, {
     fadeInDuration: CONFIG.titleFadeIn,
     stayDuration: CONFIG.titleStay,
     fadeOutDuration: CONFIG.titleFadeOut,
-    subtitle: `§7Days Survived: §f${days}`
+    subtitle: subtitle
   });
 }
 
-export function isHostileNearby(player, radius = 12) {
+export function isHostileNearby(player, radius = 14) {
   const entities = player.dimension.getEntities({
     location: player.location,
     maxDistance: radius,
     excludeTypes: ["minecraft:player", "minecraft:item", "minecraft:xp_orb"]
   });
 
-  const hostileKeywords = [
-    "zombie", "skeleton", "creeper", "spider", "enderman",
-    "witch", "phantom", "pillager", "vindicator", "evoker",
-    "ravager", "hoglin", "piglin_brute", "warden"
+  const keywords = [
+    "zombie", "skeleton", "creeper", "spider", "enderman", "witch",
+    "phantom", "pillager", "vindicator", "evoker", "ravager",
+    "hoglin", "piglin_brute", "warden", "blaze", "ghast"
   ];
 
   return entities.some(e => {
     const id = e.typeId.toLowerCase();
-    return hostileKeywords.some(k => id.includes(k));
+    return keywords.some(k => id.includes(k));
   });
+}
+
+export function distance2D(a, b) {
+  const dx = a.x - b.x;
+  const dz = a.z - b.z;
+  return Math.sqrt(dx * dx + dz * dz);
+}
+
+export function lerp(a, b, t) {
+  return a + (b - a) * t;
 }
