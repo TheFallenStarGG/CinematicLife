@@ -255,4 +255,4 @@ function endCutscene(player) {
 
   applyRespawnProtection(player);
   inCutscene.delete(player.id);
-                                           }
+}
