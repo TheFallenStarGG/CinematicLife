@@ -5,11 +5,12 @@ import {
   hasBedSpawn,
   applyRespawnProtection,
   distance2D,
-  lerp
+  lerp,
+  getPlayerUseCustomEntity
 } from "./utils.js";
 
 const inCutscene = new Set();
-const pendingDeath = new Map(); // playerId → { deathLoc, time }
+const pendingDeath = new Map(); // playerId → { deathLoc }
 
 // === DEATH ===
 world.afterEvents.entityDie.subscribe((event) => {
@@ -17,11 +18,15 @@ world.afterEvents.entityDie.subscribe((event) => {
   if (player?.typeId !== "minecraft:player") return;
   if (inCutscene.has(player.id) || pendingDeath.has(player.id)) return;
 
-  const deathLoc = { ...player.location };
+  const deathLoc = {
+    x: player.location.x,
+    y: player.location.y,
+    z: player.location.z
+  };
 
-  pendingDeath.set(player.id, { deathLoc, time: system.currentTick });
+  pendingDeath.set(player.id, { deathLoc });
 
-  // Soft black fade + sound (improvement 7)
+  // Soft black fade
   if (CONFIG.deathFade) {
     try {
       player.camera.fade({
@@ -31,17 +36,18 @@ world.afterEvents.entityDie.subscribe((event) => {
     } catch (e) {}
   }
 
+  // Death sound
   try {
     player.playSound(CONFIG.deathSound, { volume: 0.7, pitch: 0.9 });
   } catch (e) {}
 
-  // Show randomised title almost immediately
+  // Show randomised "You Died" title
   system.runTimeout(() => {
     if (player.isValid) playYouDiedScreen(player);
   }, 8);
 });
 
-// === RESPAWN (true-ish instant feel) ===
+// === RESPAWN ===
 world.afterEvents.playerSpawn.subscribe((event) => {
   const player = event.player;
   if (event.initialSpawn) return;
@@ -52,7 +58,7 @@ world.afterEvents.playerSpawn.subscribe((event) => {
 
   if (inCutscene.has(player.id)) return;
 
-  // Extremely short delay so the player is fully valid, then cutscene
+  // Tiny delay so the player is fully valid
   system.runTimeout(() => {
     if (!player.isValid) return;
     startRespawnSequence(player, data.deathLoc);
@@ -69,13 +75,13 @@ function startRespawnSequence(player, deathLoc) {
   }
 }
 
-// === SKY DROP (improvements 9 + 10) ===
+// === SKY DROP ===
 function playSkyDropCutscene(player, deathLoc) {
   const spawnLoc = player.location;
   const dist = distance2D(deathLoc, spawnLoc);
 
-  // Scale height & duration by distance (improvement 10)
-  const t = Math.min(dist / 200, 1); // 200 blocks = max intensity
+  // Scale intensity by distance
+  const t = Math.min(dist / 200, 1);
   const height = lerp(CONFIG.skyDropBaseHeight, CONFIG.skyDropMaxHeight, t);
   const duration = Math.floor(lerp(CONFIG.skyDropBaseDuration, CONFIG.skyDropMaxDuration, t));
 
@@ -84,8 +90,6 @@ function playSkyDropCutscene(player, deathLoc) {
 
   try {
     player.teleport(dropPos);
-
-    // Initial high camera
     player.camera.setCamera("minecraft:free", {
       location: { x: dropPos.x, y: dropPos.y + 6, z: dropPos.z },
       rotation: { x: 90, y: 0 }
@@ -110,13 +114,11 @@ function playSkyDropCutscene(player, deathLoc) {
 
     ticks++;
     const progress = Math.min(ticks / duration, 1);
-    // Ease-in curve for smoother fall (improvement 9)
-    const eased = progress * progress;
+    const eased = progress * progress; // ease-in
     const currentY = startY - (height * eased);
 
     try {
       player.teleport({ x: dropPos.x, y: currentY, z: dropPos.z });
-
       player.camera.setCamera("minecraft:free", {
         location: { x: dropPos.x, y: currentY + 5, z: dropPos.z },
         rotation: { x: 75 + progress * 15, y: player.getRotation().y }
@@ -138,13 +140,77 @@ function endSkyDrop(player, intervalId) {
   player.sendMessage("§aYou have respawned.");
 }
 
-// === BED WAKE (improvement 12 – slow orbit) ===
+// === BED WAKE CUTSCENE (branches here) ===
 function playBedWakeCutscene(player) {
+  const useCustom = getPlayerUseCustomEntity(player);
+
+  if (useCustom) {
+    playCustomEntityWakeCutscene(player);
+  } else {
+    playRealPlayerWakeCutscene(player);
+  }
+}
+
+function playRealPlayerWakeCutscene(player) {
   try {
     player.playAnimation("animation.player.cinematic.wake_up");
   } catch (e) {}
 
-  const center = player.location;
+  runOrbitCamera(player, player.location, () => {
+    endCutscene(player);
+  });
+}
+
+function playCustomEntityWakeCutscene(player) {
+  const loc = player.location;
+  const dim = player.dimension;
+
+  // Hide real player
+  try {
+    player.addEffect("invisibility", 200, {
+      amplifier: 0,
+      showParticles: false
+    });
+  } catch (e) {}
+
+  let entity = null;
+  try {
+    entity = dim.spawnEntity("cinematic:cutscene_player", loc);
+  } catch (e) {
+    console.warn("Failed to spawn cutscene entity:", e);
+    // Fallback to real player method
+    try {
+      player.removeEffect("invisibility");
+    } catch (e2) {}
+    playRealPlayerWakeCutscene(player);
+    return;
+  }
+
+  // Face the same direction as the player
+  try {
+    entity.setRotation(player.getRotation());
+  } catch (e) {}
+
+  runOrbitCamera(player, loc, () => {
+    try {
+      if (entity && entity.isValid) entity.remove();
+    } catch (e) {}
+
+    try {
+      player.removeEffect("invisibility");
+    } catch (e) {}
+
+    endCutscene(player);
+  });
+}
+
+// Shared orbiting camera
+function runOrbitCamera(player, center, onDone) {
+  if (!CONFIG.bedCameraOrbit) {
+    system.runTimeout(onDone, CONFIG.wakeUpAnimDuration);
+    return;
+  }
+
   const radius = 3.2;
   const duration = CONFIG.wakeUpAnimDuration;
   let ticks = 0;
@@ -152,13 +218,13 @@ function playBedWakeCutscene(player) {
   const orbit = system.runInterval(() => {
     if (!player.isValid) {
       system.clearRun(orbit);
-      inCutscene.delete(player.id);
+      onDone();
       return;
     }
 
     ticks++;
     const progress = ticks / duration;
-    const angle = progress * Math.PI * 1.4; // ~250 degree slow arc
+    const angle = progress * Math.PI * 1.4; // slow arc
 
     const camX = center.x + Math.cos(angle) * radius;
     const camZ = center.z + Math.sin(angle) * radius;
@@ -167,13 +233,17 @@ function playBedWakeCutscene(player) {
     try {
       player.camera.setCamera("minecraft:free", {
         location: { x: camX, y: camY, z: camZ },
-        facingLocation: { x: center.x, y: center.y + 1.0, z: center.z }
+        facingLocation: {
+          x: center.x,
+          y: center.y + 1.0,
+          z: center.z
+        }
       });
     } catch (e) {}
 
     if (ticks >= duration) {
       system.clearRun(orbit);
-      endCutscene(player);
+      onDone();
     }
   }, 1);
 }
@@ -182,6 +252,7 @@ function endCutscene(player) {
   try {
     player.camera.clear();
   } catch (e) {}
+
   applyRespawnProtection(player);
   inCutscene.delete(player.id);
-        }
+                                           }
