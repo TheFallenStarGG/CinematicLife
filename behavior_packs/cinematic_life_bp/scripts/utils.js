@@ -1,4 +1,3 @@
-import { world, system, GameMode } from "@minecraft/server";
 import { CONFIG } from "./config.js";
 
 export function getDaysSurvived(player) {
@@ -15,19 +14,22 @@ export function incrementDaysSurvived(player) {
 }
 
 export function hasBedSpawn(player) {
-  const spawn = player.getSpawnPoint();
-  return spawn !== undefined;
+  return player.getSpawnPoint() !== undefined;
 }
 
 export function applyRespawnProtection(player) {
-  player.addEffect("resistance", CONFIG.respawnProtectionSeconds * 20, {
-    amplifier: 255,
-    showParticles: false
-  });
-  player.addEffect("fire_resistance", CONFIG.respawnProtectionSeconds * 20, {
-    amplifier: 0,
-    showParticles: false
-  });
+  try {
+    player.addEffect("resistance", CONFIG.respawnProtectionSeconds * 20, {
+      amplifier: 255,
+      showParticles: false
+    });
+    player.addEffect("fire_resistance", CONFIG.respawnProtectionSeconds * 20, {
+      amplifier: 0,
+      showParticles: false
+    });
+  } catch (e) {
+    console.warn("Failed to apply respawn protection:", e);
+  }
 }
 
 export function playYouDiedScreen(player) {
@@ -41,17 +43,20 @@ export function playYouDiedScreen(player) {
 }
 
 export function isHostileNearby(player, radius = 12) {
-  const hostiles = player.dimension.getEntities({
+  const entities = player.dimension.getEntities({
     location: player.location,
     maxDistance: radius,
-    excludeTypes: ["minecraft:player", "minecraft:item", "minecraft:xp_orb"],
-    excludeFamilies: ["inanimate"]
+    excludeTypes: ["minecraft:player", "minecraft:item", "minecraft:xp_orb"]
   });
-  return hostiles.some(e => {
-    const type = e.typeId;
-    return type.includes("zombie") || type.includes("skeleton") || 
-           type.includes("creeper") || type.includes("spider") || 
-           type.includes("enderman") || type.includes("witch") ||
-           type.includes("phantom") || type.includes("pillager");
+
+  const hostileKeywords = [
+    "zombie", "skeleton", "creeper", "spider", "enderman",
+    "witch", "phantom", "pillager", "vindicator", "evoker",
+    "ravager", "hoglin", "piglin_brute", "warden"
+  ];
+
+  return entities.some(e => {
+    const id = e.typeId.toLowerCase();
+    return hostileKeywords.some(k => id.includes(k));
   });
 }
