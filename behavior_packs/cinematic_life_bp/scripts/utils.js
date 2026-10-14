@@ -81,3 +81,22 @@ export function distance2D(a, b) {
 export function lerp(a, b, t) {
   return a + (b - a) * t;
 }
+
+export function getPlayerUseCustomEntity(player) {
+  const personal = player.getDynamicProperty("cinematic:use_custom_entity");
+  if (personal !== undefined) return personal;          // player has personal preference
+  return CONFIG.serverUseCustomEntity;                  // fall back to server default
+}
+
+export function setPlayerUseCustomEntity(player, value) {
+  player.setDynamicProperty("cinematic:use_custom_entity", value);
+}
+
+export function isOperator(player) {
+  // Simple check – works on most servers / Realms
+  try {
+    return player.isOp; // available in newer Script API
+  } catch {
+    return false;
+  }
+}
