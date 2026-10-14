@@ -6,13 +6,19 @@
       "states": {
         "default": {
           "transitions": [
-            { "waking": "query.is_alive && variable.cinematic_wake == 1.0" }
+            {
+              "waking": "query.is_alive"
+            }
           ]
         },
         "waking": {
-          "animations": ["wake_up"],
+          "animations": [
+            "wake_up"
+          ],
           "transitions": [
-            { "default": "query.all_animations_finished" }
+            {
+              "default": "query.all_animations_finished"
+            }
           ]
         }
       }
