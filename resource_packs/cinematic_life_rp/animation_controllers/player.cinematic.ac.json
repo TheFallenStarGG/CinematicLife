@@ -1,0 +1,21 @@
+{
+  "format_version": "1.10.0",
+  "animation_controllers": {
+    "controller.animation.player.cinematic": {
+      "initial_state": "default",
+      "states": {
+        "default": {
+          "transitions": [
+            { "waking": "query.is_alive && variable.cinematic_wake == 1.0" }
+          ]
+        },
+        "waking": {
+          "animations": ["wake_up"],
+          "transitions": [
+            { "default": "query.all_animations_finished" }
+          ]
+        }
+      }
+    }
+  }
+}
